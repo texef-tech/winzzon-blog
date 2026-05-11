@@ -17,7 +17,12 @@ jobs:
           cache: true
 
       - name: Run tests
-        run: go test ./...
+        run: |
+          if find . -name "*_test.go" | grep -q .; then
+            go test ./...
+          else
+            echo "No tests found, skipping"
+          fi
 
   build-push:
     name: Build and push Docker image
