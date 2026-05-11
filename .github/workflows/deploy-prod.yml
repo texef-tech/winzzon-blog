@@ -33,21 +33,19 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+	
+	 - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Docker image
+        run: docker build -t ghcr.io/${{ github.repository }}:staging -t ghcr.io/${{ github.repository }}:staging-${{ github.sha }} .
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:prod-${{ github.sha }}
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/${{ github.repository }}:staging
+          docker push ghcr.io/${{ github.repository }}:staging-${{ github.sha }}
+
+
 
   deploy:
     name: Deploy to production VPS
