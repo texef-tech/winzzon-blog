@@ -1,0 +1,28 @@
+# Binaries
+bin/
+*.exe
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.staging
+.env.production
+
+# Go build cache
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+coverage.out
+coverage.html
+
+# Docker override (local only)
+docker-compose.override.yml

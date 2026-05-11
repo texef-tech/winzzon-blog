@@ -1,0 +1,72 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  lint-test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Run tests
+        run: |
+          if find . -name "*_test.go" | grep -q .; then
+            go test ./...
+          else
+            echo "No tests found, skipping"
+          fi
+
+  build-push:
+    name: Build and push Docker image
+    needs: lint-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+ 	- name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t ghcr.io/${{ github.repository }}:staging -t ghcr.io/${{ github.repository }}:staging-${{ github.sha }} .
+
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/${{ github.repository }}:staging
+          docker push ghcr.io/${{ github.repository }}:staging-${{ github.sha }}
+
+
+
+
+  deploy:
+    name: Deploy to staging VPS
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/winzzon/staging
+
+            echo "${{ secrets.STAGING_ENV_FILE }}" > .env
+
+            docker pull ghcr.io/${{ github.repository }}:staging
+
+            docker compose -f docker-compose.staging.yml up -d --no-deps api
+
+            docker image prune -f
