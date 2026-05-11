@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS post_tags;
+DROP TABLE IF EXISTS post_categories;
+DROP TABLE IF EXISTS tags;
+DROP TABLE IF EXISTS categories;

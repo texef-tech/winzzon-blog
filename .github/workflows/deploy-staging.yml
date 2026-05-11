@@ -31,8 +31,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-
-	steps:
+    steps:
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
@@ -45,7 +44,6 @@ jobs:
         run: |
           docker push ghcr.io/${{ github.repository }}:staging
           docker push ghcr.io/${{ github.repository }}:staging-${{ github.sha }}
-
 
   deploy:
     name: Deploy to staging VPS

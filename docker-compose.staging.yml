@@ -1,0 +1,83 @@
+services:
+  api:
+    image: ghcr.io/texef-tech/winzzon-blog:staging
+    container_name: winzzon-staging-api
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - winzzon-staging
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: winzzon-staging-postgres
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: winzzon_blog_staging
+      POSTGRES_USER: winzzon
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U winzzon -d winzzon_blog_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - winzzon-staging
+
+  redis:
+    image: redis:7-alpine
+    container_name: winzzon-staging-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - winzzon-staging
+
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    container_name: winzzon-staging-meili
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_API_KEY}
+    volumes:
+      - meili_data:/meili_data
+    networks:
+      - winzzon-staging
+
+  migrate:
+    image: migrate/migrate
+    container_name: winzzon-staging-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command: ["-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
+    networks:
+      - winzzon-staging
+
+volumes:
+  postgres_data:
+  meili_data:
+
+networks:
+  winzzon-staging:
+    driver: bridge

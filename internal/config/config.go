@@ -1,6 +1,8 @@
 package config
 
 import (
+	"log"
+
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
@@ -32,6 +34,14 @@ type Config struct {
 	SiteName       string
 }
 
+func (c *Config) IsDevelopment() bool {
+	return c.Env == "development"
+}
+
+func (c *Config) IsProduction() bool {
+	return c.Env == "production"
+}
+
 func Load() *Config {
 	_ = godotenv.Load()
 
@@ -41,7 +51,7 @@ func Load() *Config {
 	viper.SetDefault("ENV", "development")
 	viper.SetDefault("JWT_EXPIRY_HOURS", 24)
 
-	return &Config{
+	cfg := &Config{
 		Port: viper.GetString("PORT"),
 		Env:  viper.GetString("ENV"),
 
@@ -67,4 +77,19 @@ func Load() *Config {
 		SiteURL:        viper.GetString("SITE_URL"),
 		SiteName:       viper.GetString("SITE_NAME"),
 	}
+
+	required := map[string]string{
+		"DATABASE_URL": cfg.DatabaseURL,
+		"REDIS_URL":    cfg.RedisURL,
+		"JWT_SECRET":   cfg.JWTSecret,
+		"SITE_URL":     cfg.SiteURL,
+		"SITE_NAME":    cfg.SiteName,
+	}
+	for key, val := range required {
+		if val == "" {
+			log.Fatalf("required environment variable %s is not set", key)
+		}
+	}
+
+	return cfg
 }
