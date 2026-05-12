@@ -1,0 +1,83 @@
+services:
+  api:
+    image: ghcr.io/texef-tech/winzzon-blog:latest
+    container_name: winzzon-prod-api
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - winzzon-prod
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: winzzon-prod-postgres
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: winzzon_blog
+      POSTGRES_USER: winzzon
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U winzzon -d winzzon_blog"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - winzzon-prod
+
+  redis:
+    image: redis:7-alpine
+    container_name: winzzon-prod-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - winzzon-prod
+
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    container_name: winzzon-prod-meili
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_API_KEY}
+    volumes:
+      - meili_data:/meili_data
+    networks:
+      - winzzon-prod
+
+  migrate:
+    image: migrate/migrate
+    container_name: winzzon-prod-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command: ["-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
+    networks:
+      - winzzon-prod
+
+volumes:
+  postgres_data:
+  meili_data:
+
+networks:
+  winzzon-prod:
+    driver: bridge
