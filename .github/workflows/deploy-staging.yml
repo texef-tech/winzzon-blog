@@ -58,7 +58,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            cd /home/winzzon/staging
+            cd /home/archon/staging
 
             echo "${{ secrets.STAGING_ENV_FILE }}" > .env
 

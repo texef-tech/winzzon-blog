@@ -58,7 +58,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            cd /home/winzzon/production
+            cd /home/archon/production
 
             echo "${{ secrets.PROD_ENV_FILE }}" > .env
 
