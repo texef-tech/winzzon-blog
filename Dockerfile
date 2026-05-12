@@ -3,10 +3,14 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o server ./cmd/server
+RUN go build -o server ./cmd/server && \
+    go build -o seed ./scripts/seed && \
+    go build -o reindex ./scripts/reindex
 
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/server .
+COPY --from=builder /app/seed .
+COPY --from=builder /app/reindex .
 EXPOSE 8080
 CMD ["./server"]
