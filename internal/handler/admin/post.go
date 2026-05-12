@@ -22,18 +22,18 @@ func NewPostHandler(q *sqlc.Queries, ps *service.PostService) *PostHandler {
 }
 
 type postResponse struct {
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	Slug        string     `json:"slug"`
-	Body        string     `json:"body"`
-	Excerpt     string     `json:"excerpt,omitempty"`
-	ReadingTime int32      `json:"reading_time"`
-	Status      string     `json:"status"`
-	PublishedAt *string    `json:"published_at,omitempty"`
-	CreatedAt   string     `json:"created_at"`
-	UpdatedAt   string     `json:"updated_at"`
-	Categories  []catBrief `json:"categories,omitempty"`
-	Tags        []tagBrief `json:"tags,omitempty"`
+	ID          string      `json:"id"`
+	Title       string      `json:"title"`
+	Slug        string      `json:"slug"`
+	Body        string      `json:"body"`
+	Excerpt     string      `json:"excerpt,omitempty"`
+	ReadingTime int32       `json:"reading_time"`
+	Status      string      `json:"status"`
+	PublishedAt *string     `json:"published_at,omitempty"`
+	CreatedAt   string      `json:"created_at"`
+	UpdatedAt   string      `json:"updated_at"`
+	Categories  []catBrief  `json:"categories,omitempty"`
+	Tags        []tagBrief  `json:"tags,omitempty"`
 }
 
 type catBrief struct {
@@ -54,10 +54,10 @@ func toPostResponse(p sqlc.Post) postResponse {
 		Title:       p.Title,
 		Slug:        p.Slug,
 		Body:        p.Body,
-		ReadingTime: p.ReadingTimeMinutes.Int32,
+		ReadingTime: p.ReadingTime.Int32,
 		Status:      p.Status,
-		CreatedAt:   p.CreatedAt.Time.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   p.UpdatedAt.Time.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   p.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:   p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 	if p.Excerpt.Valid {
 		resp.Excerpt = p.Excerpt.String
@@ -75,8 +75,8 @@ func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 || limit > 100 {
-		limit = 20
+	if limit < 1 || limit > 50 {
+		limit = 10
 	}
 	offset := (page - 1) * limit
 
@@ -88,16 +88,16 @@ func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	total, _ := h.queries.CountAllPosts(r.Context())
 
-	var resp []postResponse
+	var items []postResponse
 	for _, p := range posts {
-		resp = append(resp, toPostResponse(p))
+		items = append(items, toPostResponse(p))
 	}
-	if resp == nil {
-		resp = []postResponse{}
+	if items == nil {
+		items = []postResponse{}
 	}
 
 	handler.JSON(w, http.StatusOK, map[string]interface{}{
-		"data":  resp,
+		"data":  items,
 		"total": total,
 		"page":  page,
 		"limit": limit,
@@ -180,10 +180,6 @@ func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Body must be at least 10 characters")
 		return
 	}
-	if len(input.Excerpt) > 300 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Excerpt must be at most 300 characters")
-		return
-	}
 
 	post, err := h.postService.Update(r.Context(), id, input)
 	if err != nil {
@@ -233,7 +229,7 @@ func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.postService.Delete(r.Context(), id); err != nil {
+	if err := h.postService.SoftDelete(r.Context(), id); err != nil {
 		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete post")
 		return
 	}
