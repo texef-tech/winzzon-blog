@@ -50,17 +50,6 @@ jobs:
     needs: build-push
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Copy files to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.staging.yml,migrations/"
-          target: "/home/archon/staging"
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -70,6 +59,16 @@ jobs:
           script: |
             set -e
             cd /home/archon/staging
+
+            # Clone or pull the repo to get docker-compose and migrations
+            if [ -d "repo" ]; then
+              cd repo && git fetch origin staging && git reset --hard origin/staging && cd ..
+            else
+              git clone --branch staging --single-branch https://github.com/${{ github.repository }}.git repo
+            fi
+
+            cp repo/docker-compose.staging.yml .
+            cp -r repo/migrations/ .
 
             echo '${{ secrets.STAGING_ENV_FILE }}' > .env
 
