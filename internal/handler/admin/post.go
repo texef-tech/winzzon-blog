@@ -22,26 +22,28 @@ func NewPostHandler(q *sqlc.Queries, ps *service.PostService) *PostHandler {
 }
 
 type postResponse struct {
-	ID          string      `json:"id"`
-	Title       string      `json:"title"`
-	Slug        string      `json:"slug"`
-	Body        string      `json:"body"`
-	Excerpt     string      `json:"excerpt,omitempty"`
-	ReadingTime int32       `json:"reading_time"`
-	Status      string      `json:"status"`
-	PublishedAt *string     `json:"published_at,omitempty"`
-	CreatedAt   string      `json:"created_at"`
-	UpdatedAt   string      `json:"updated_at"`
-	Categories  []catBrief  `json:"categories,omitempty"`
-	Tags        []tagBrief  `json:"tags,omitempty"`
+	ID          string     `json:"id"`
+	Title       string     `json:"title"`
+	Slug        string     `json:"slug"`
+	Body        string     `json:"body"`
+	Excerpt     string     `json:"excerpt,omitempty"`
+	ReadingTime int32      `json:"reading_time"`
+	Status      string     `json:"status"`
+	PublishedAt *string    `json:"published_at,omitempty"`
+	CreatedAt   string     `json:"created_at"`
+	UpdatedAt   string     `json:"updated_at"`
+	Categories  []catBrief `json:"categories,omitempty"`
+	Tags        []tagBrief `json:"tags,omitempty"`
 }
 
 type catBrief struct {
+	ID   string `json:"id"`
 	Name string `json:"name"`
 	Slug string `json:"slug"`
 }
 
 type tagBrief struct {
+	ID   string `json:"id"`
 	Name string `json:"name"`
 	Slug string `json:"slug"`
 }
@@ -52,10 +54,10 @@ func toPostResponse(p sqlc.Post) postResponse {
 		Title:       p.Title,
 		Slug:        p.Slug,
 		Body:        p.Body,
-		ReadingTime: p.ReadingTime.Int32,
+		ReadingTime: p.ReadingTimeMinutes.Int32,
 		Status:      p.Status,
-		CreatedAt:   p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   p.CreatedAt.Time.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:   p.UpdatedAt.Time.Format("2006-01-02T15:04:05Z"),
 	}
 	if p.Excerpt.Valid {
 		resp.Excerpt = p.Excerpt.String
@@ -73,8 +75,8 @@ func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 || limit > 50 {
-		limit = 10
+	if limit < 1 || limit > 100 {
+		limit = 20
 	}
 	offset := (page - 1) * limit
 
@@ -86,16 +88,16 @@ func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	total, _ := h.queries.CountAllPosts(r.Context())
 
-	var items []postResponse
+	var resp []postResponse
 	for _, p := range posts {
-		items = append(items, toPostResponse(p))
+		resp = append(resp, toPostResponse(p))
 	}
-	if items == nil {
-		items = []postResponse{}
+	if resp == nil {
+		resp = []postResponse{}
 	}
 
 	handler.JSON(w, http.StatusOK, map[string]interface{}{
-		"data":  items,
+		"data":  resp,
 		"total": total,
 		"page":  page,
 		"limit": limit,
@@ -119,10 +121,10 @@ func (h *PostHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	cats, _ := h.queries.ListCategoriesForPost(r.Context(), post.ID)
 	tags, _ := h.queries.ListTagsForPost(r.Context(), post.ID)
 	for _, c := range cats {
-		resp.Categories = append(resp.Categories, catBrief{Name: c.Name, Slug: c.Slug})
+		resp.Categories = append(resp.Categories, catBrief{ID: c.ID.String(), Name: c.Name, Slug: c.Slug})
 	}
 	for _, t := range tags {
-		resp.Tags = append(resp.Tags, tagBrief{Name: t.Name, Slug: t.Slug})
+		resp.Tags = append(resp.Tags, tagBrief{ID: t.ID.String(), Name: t.Name, Slug: t.Slug})
 	}
 
 	handler.JSON(w, http.StatusOK, resp)
@@ -178,6 +180,10 @@ func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Body must be at least 10 characters")
 		return
 	}
+	if len(input.Excerpt) > 300 {
+		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Excerpt must be at most 300 characters")
+		return
+	}
 
 	post, err := h.postService.Update(r.Context(), id, input)
 	if err != nil {
@@ -227,7 +233,7 @@ func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.postService.SoftDelete(r.Context(), id); err != nil {
+	if err := h.postService.Delete(r.Context(), id); err != nil {
 		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete post")
 		return
 	}
