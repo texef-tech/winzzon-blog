@@ -54,10 +54,10 @@ func toPostResponse(p sqlc.Post) postResponse {
 		Title:       p.Title,
 		Slug:        p.Slug,
 		Body:        p.Body,
-		ReadingTime: p.ReadingTimeMinutes.Int32,
+		ReadingTime: p.ReadingTime.Int32,
 		Status:      p.Status,
-		CreatedAt:   p.CreatedAt.Time.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   p.UpdatedAt.Time.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   p.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:   p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 	if p.Excerpt.Valid {
 		resp.Excerpt = p.Excerpt.String
@@ -233,7 +233,7 @@ func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.postService.Delete(r.Context(), id); err != nil {
+	if err := h.postService.SoftDelete(r.Context(), id); err != nil {
 		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete post")
 		return
 	}
