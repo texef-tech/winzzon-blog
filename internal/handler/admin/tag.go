@@ -44,12 +44,12 @@ func toTagResponse(t sqlc.Tag) tagResponse {
 func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req tagRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		handler.BadRequest(w, "INVALID_BODY", "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Name is required")
+		handler.ValidationErrorJSON(w, map[string]string{"name": "Name is required"})
 		return
 	}
 
@@ -69,13 +69,13 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TagHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid tag ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid tag ID")
 		return
 	}
 
 	var req tagRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		handler.BadRequest(w, "INVALID_BODY", "Invalid request body")
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *TagHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Slug: slug.Generate(req.Name),
 	})
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update tag")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to update tag")
 		return
 	}
 
@@ -96,12 +96,12 @@ func (h *TagHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *TagHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid tag ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid tag ID")
 		return
 	}
 
 	if err := h.queries.DeleteTag(r.Context(), id); err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete tag")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to delete tag")
 		return
 	}
 
