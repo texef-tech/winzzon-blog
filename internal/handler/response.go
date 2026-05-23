@@ -99,3 +99,8 @@ func ServerError(w http.ResponseWriter, code, message string) {
 	ErrorJSON(w, http.StatusInternalServerError, code, message)
 }
 
+func Conflict(w http.ResponseWriter, code, message string) {
+	ErrorJSON(w, http.StatusConflict, code, message)
+}
+
+

@@ -51,12 +51,12 @@ func toCategoryResponse(c sqlc.Category) categoryResponse {
 func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req categoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		handler.BadRequest(w, "INVALID_BODY", "Invalid request body")
 		return
 	}
 
 	if req.Name == "" {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Name is required")
+		handler.ValidationErrorJSON(w, map[string]string{"name": "Name is required"})
 		return
 	}
 
@@ -66,7 +66,7 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Description: pgtype.Text{String: req.Description, Valid: req.Description != ""},
 	})
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusConflict, "CATEGORY_EXISTS", "A category with this name already exists")
+		handler.Conflict(w, "CATEGORY_EXISTS", "A category with this name already exists")
 		return
 	}
 
@@ -77,13 +77,13 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid category ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid category ID")
 		return
 	}
 
 	var req categoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		handler.BadRequest(w, "INVALID_BODY", "Invalid request body")
 		return
 	}
 
@@ -94,7 +94,7 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Description: pgtype.Text{String: req.Description, Valid: req.Description != ""},
 	})
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update category")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to update category")
 		return
 	}
 
@@ -105,12 +105,12 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid category ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid category ID")
 		return
 	}
 
 	if err := h.queries.DeleteCategory(r.Context(), id); err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete category")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to delete category")
 		return
 	}
 

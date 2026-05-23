@@ -83,13 +83,13 @@ func toSEOResponse(s sqlc.SeoMeta) seoResponse {
 func (h *SEOHandler) Get(w http.ResponseWriter, r *http.Request) {
 	postID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid post ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid post ID")
 		return
 	}
 
 	seo, err := h.queries.GetSEOByPostID(r.Context(), postID)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusNotFound, "SEO_NOT_FOUND", "SEO meta not found for this post")
+		handler.NotFound(w, "SEO_NOT_FOUND", "SEO meta not found for this post")
 		return
 	}
 
@@ -99,22 +99,22 @@ func (h *SEOHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *SEOHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 	postID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid post ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid post ID")
 		return
 	}
 
 	var req seoRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		handler.BadRequest(w, "INVALID_BODY", "Invalid request body")
 		return
 	}
 
 	if len(req.MetaTitle) > 60 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Meta title must be at most 60 characters")
+		handler.ValidationErrorJSON(w, map[string]string{"meta_title": "Meta title must be at most 60 characters"})
 		return
 	}
 	if len(req.MetaDescription) > 160 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Meta description must be at most 160 characters")
+		handler.ValidationErrorJSON(w, map[string]string{"meta_description": "Meta description must be at most 160 characters"})
 		return
 	}
 
@@ -131,7 +131,7 @@ func (h *SEOHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 		NoIndex:         pgtype.Bool{Bool: req.NoIndex, Valid: true},
 	})
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to save SEO meta")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to save SEO meta")
 		return
 	}
 

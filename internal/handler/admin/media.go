@@ -65,14 +65,14 @@ func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "MISSING_FILE", "File field is required")
+		handler.BadRequest(w, "MISSING_FILE", "File field is required")
 		return
 	}
 	defer file.Close()
 
 	contentType := fileHeader.Header.Get("Content-Type")
 	if !service.IsAllowedMimeType(contentType) {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "INVALID_FILE_TYPE", "Only jpeg, png, webp, and gif images are allowed")
+		handler.Unprocessable(w, "INVALID_FILE_TYPE", "Only jpeg, png, webp, and gif images are allowed")
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		r.Context(), file, fileHeader.Filename, contentType, int32(fileHeader.Size), 0, 0,
 	)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "UPLOAD_FAILED", "Failed to upload file")
+		handler.ServerError(w, "UPLOAD_FAILED", "Failed to upload file")
 		return
 	}
 
@@ -100,11 +100,15 @@ func (h *MediaHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.queries.ListMedia(r.Context(), int32(limit), int32(offset))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list media")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to list media")
 		return
 	}
 
-	total, _ := h.queries.CountMedia(r.Context())
+	total, err := h.queries.CountMedia(r.Context())
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to count media")
+		return
+	}
 
 	var resp []mediaResponse
 	for _, m := range items {
@@ -125,12 +129,12 @@ func (h *MediaHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *MediaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid media ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid media ID")
 		return
 	}
 
 	if err := h.mediaService.Delete(r.Context(), id); err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete media")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to delete media")
 		return
 	}
 

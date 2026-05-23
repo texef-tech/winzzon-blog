@@ -34,23 +34,23 @@ type loginResponse struct {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		handler.BadRequest(w, "INVALID_BODY", "Invalid request body")
 		return
 	}
 
 	if req.Username == "" || req.Password == "" {
-		handler.ErrorJSON(w, http.StatusBadRequest, "MISSING_FIELDS", "Username and password are required")
+		handler.BadRequest(w, "MISSING_FIELDS", "Username and password are required")
 		return
 	}
 
 	admin, err := h.queries.GetAdminByUsername(r.Context(), req.Username)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid username or password")
+		handler.Unauthorized(w, "INVALID_CREDENTIALS", "Invalid username or password")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.Password)); err != nil {
-		handler.ErrorJSON(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid username or password")
+		handler.Unauthorized(w, "INVALID_CREDENTIALS", "Invalid username or password")
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	tokenStr, err := token.SignedString([]byte(h.jwtSecret))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to generate token")
+		handler.ServerError(w, "TOKEN_ERROR", "Failed to generate token")
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if len(authHeader) < 8 {
-		handler.ErrorJSON(w, http.StatusUnauthorized, "UNAUTHORIZED", "Missing token")
+		handler.Unauthorized(w, "UNAUTHORIZED", "Missing token")
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return []byte(h.jwtSecret), nil
 	})
 	if err != nil || !token.Valid {
-		handler.ErrorJSON(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid token")
+		handler.Unauthorized(w, "UNAUTHORIZED", "Invalid token")
 		return
 	}
 
@@ -103,7 +103,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	newTokenStr, err := newToken.SignedString([]byte(h.jwtSecret))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to refresh token")
+		handler.ServerError(w, "TOKEN_ERROR", "Failed to refresh token")
 		return
 	}
 

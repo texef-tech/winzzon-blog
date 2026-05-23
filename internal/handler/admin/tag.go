@@ -58,7 +58,7 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Slug: slug.Generate(req.Name),
 	})
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusConflict, "TAG_EXISTS", "A tag with this name already exists")
+		handler.Conflict(w, "TAG_EXISTS", "A tag with this name already exists")
 		return
 	}
 
