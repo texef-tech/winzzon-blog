@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/texef-tech/winzzon-blog/internal/handler"
 )
 
 type contextKey string
@@ -18,13 +19,13 @@ func JWTAuth(secret string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				http.Error(w, `{"error":{"code":"UNAUTHORIZED","message":"Missing authorization header"}}`, http.StatusUnauthorized)
+				handler.Unauthorized(w, "UNAUTHORIZED", "Missing authorization header")
 				return
 			}
 
 			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 			if tokenStr == authHeader {
-				http.Error(w, `{"error":{"code":"UNAUTHORIZED","message":"Invalid authorization format"}}`, http.StatusUnauthorized)
+				handler.Unauthorized(w, "UNAUTHORIZED", "Invalid authorization format")
 				return
 			}
 
@@ -35,20 +36,20 @@ func JWTAuth(secret string) func(http.Handler) http.Handler {
 				return []byte(secret), nil
 			})
 			if err != nil || !token.Valid {
-				http.Error(w, `{"error":{"code":"UNAUTHORIZED","message":"Invalid or expired token"}}`, http.StatusUnauthorized)
+				handler.Unauthorized(w, "UNAUTHORIZED", "Invalid or expired token")
 				return
 			}
 
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
-				http.Error(w, `{"error":{"code":"UNAUTHORIZED","message":"Invalid token claims"}}`, http.StatusUnauthorized)
+				handler.Unauthorized(w, "UNAUTHORIZED", "Invalid token claims")
 				return
 			}
 
 			sub, _ := claims.GetSubject()
 			adminID, err := uuid.Parse(sub)
 			if err != nil {
-				http.Error(w, `{"error":{"code":"UNAUTHORIZED","message":"Invalid token subject"}}`, http.StatusUnauthorized)
+				handler.Unauthorized(w, "UNAUTHORIZED", "Invalid token subject")
 				return
 			}
 

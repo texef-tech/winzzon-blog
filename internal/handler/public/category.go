@@ -38,7 +38,7 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	cats, err := h.queries.ListCategories(r.Context())
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list categories")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to list categories")
 		return
 	}
 
@@ -80,15 +80,24 @@ func (h *CategoryHandler) Posts(w http.ResponseWriter, r *http.Request) {
 
 	posts, err := h.queries.ListPublishedPostsByCategory(r.Context(), categorySlug, int32(limit), int32(offset))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list posts")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to list posts")
 		return
 	}
 
-	total, _ := h.queries.CountPublishedPostsByCategory(r.Context(), categorySlug)
+	total, err := h.queries.CountPublishedPostsByCategory(r.Context(), categorySlug)
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to count posts by category")
+		return
+	}
 
 	var items []postListItem
 	for _, p := range posts {
-		items = append(items, h.posts.toListItem(r.Context(), p))
+		item, err := h.posts.toListItem(r.Context(), p)
+		if err != nil {
+			handler.ServerError(w, "INTERNAL_ERROR", "Failed to retrieve post details")
+			return
+		}
+		items = append(items, item)
 	}
 	if items == nil {
 		items = []postListItem{}

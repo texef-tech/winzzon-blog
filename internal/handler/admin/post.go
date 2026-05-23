@@ -82,11 +82,15 @@ func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	posts, err := h.queries.ListAllPosts(r.Context(), int32(limit), int32(offset))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list posts")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to list posts")
 		return
 	}
 
-	total, _ := h.queries.CountAllPosts(r.Context())
+	total, err := h.queries.CountAllPosts(r.Context())
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to count posts")
+		return
+	}
 
 	var resp []postResponse
 	for _, p := range posts {
@@ -107,19 +111,27 @@ func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid post ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid post ID")
 		return
 	}
 
 	post, err := h.queries.GetPostByID(r.Context(), id)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusNotFound, "POST_NOT_FOUND", "Post not found")
+		handler.NotFound(w, "POST_NOT_FOUND", "Post not found")
 		return
 	}
 
 	resp := toPostResponse(post)
-	cats, _ := h.queries.ListCategoriesForPost(r.Context(), post.ID)
-	tags, _ := h.queries.ListTagsForPost(r.Context(), post.ID)
+	cats, err := h.queries.ListCategoriesForPost(r.Context(), post.ID)
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to retrieve categories for post")
+		return
+	}
+	tags, err := h.queries.ListTagsForPost(r.Context(), post.ID)
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to retrieve tags for post")
+		return
+	}
 	for _, c := range cats {
 		resp.Categories = append(resp.Categories, catBrief{ID: c.ID.String(), Name: c.Name, Slug: c.Slug})
 	}
@@ -133,26 +145,26 @@ func (h *PostHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var input service.CreatePostInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		handler.BadRequest(w, "INVALID_BODY", "Invalid request body")
 		return
 	}
 
 	if len(input.Title) < 3 || len(input.Title) > 255 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Title must be between 3 and 255 characters")
+		handler.ValidationErrorJSON(w, map[string]string{"title": "Title must be between 3 and 255 characters"})
 		return
 	}
 	if len(input.Body) < 10 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Body must be at least 10 characters")
+		handler.ValidationErrorJSON(w, map[string]string{"body": "Body must be at least 10 characters"})
 		return
 	}
 	if len(input.Excerpt) > 300 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Excerpt must be at most 300 characters")
+		handler.ValidationErrorJSON(w, map[string]string{"excerpt": "Excerpt must be at most 300 characters"})
 		return
 	}
 
 	post, err := h.postService.Create(r.Context(), input)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create post")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to create post")
 		return
 	}
 
@@ -162,32 +174,32 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid post ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid post ID")
 		return
 	}
 
 	var input service.UpdatePostInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		handler.BadRequest(w, "INVALID_BODY", "Invalid request body")
 		return
 	}
 
 	if len(input.Title) < 3 || len(input.Title) > 255 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Title must be between 3 and 255 characters")
+		handler.ValidationErrorJSON(w, map[string]string{"title": "Title must be between 3 and 255 characters"})
 		return
 	}
 	if len(input.Body) < 10 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Body must be at least 10 characters")
+		handler.ValidationErrorJSON(w, map[string]string{"body": "Body must be at least 10 characters"})
 		return
 	}
 	if len(input.Excerpt) > 300 {
-		handler.ErrorJSON(w, http.StatusUnprocessableEntity, "VALIDATION_FAILED", "Excerpt must be at most 300 characters")
+		handler.ValidationErrorJSON(w, map[string]string{"excerpt": "Excerpt must be at most 300 characters"})
 		return
 	}
 
 	post, err := h.postService.Update(r.Context(), id, input)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update post")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to update post")
 		return
 	}
 
@@ -197,13 +209,13 @@ func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) Publish(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid post ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid post ID")
 		return
 	}
 
 	post, err := h.postService.Publish(r.Context(), id)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to publish post")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to publish post")
 		return
 	}
 
@@ -213,13 +225,13 @@ func (h *PostHandler) Publish(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid post ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid post ID")
 		return
 	}
 
 	post, err := h.postService.Unpublish(r.Context(), id)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to unpublish post")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to unpublish post")
 		return
 	}
 
@@ -229,12 +241,12 @@ func (h *PostHandler) Unpublish(w http.ResponseWriter, r *http.Request) {
 func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusBadRequest, "INVALID_ID", "Invalid post ID")
+		handler.BadRequest(w, "INVALID_ID", "Invalid post ID")
 		return
 	}
 
 	if err := h.postService.SoftDelete(r.Context(), id); err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete post")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to delete post")
 		return
 	}
 

@@ -160,7 +160,11 @@ func main() {
 	}
 
 	go func() {
-		log.Info().Str("port", cfg.Port).Str("env", cfg.Env).Msg("starting server")
+		log.Info().
+			Str("port", cfg.Port).
+			Str("env", cfg.Env).
+			Str("allowed_origins", cfg.AllowedOrigins).
+			Msg("starting server")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msg("server error")
 		}

@@ -31,7 +31,7 @@ func (h *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.searchService.Search(r.Context(), query, limit, offset)
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "SEARCH_ERROR", "Search failed")
+		handler.ServerError(w, "SEARCH_ERROR", "Search failed")
 		return
 	}
 

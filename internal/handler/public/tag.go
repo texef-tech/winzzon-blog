@@ -37,7 +37,7 @@ func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	tags, err := h.queries.ListTags(r.Context())
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list tags")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to list tags")
 		return
 	}
 
@@ -75,15 +75,24 @@ func (h *TagHandler) Posts(w http.ResponseWriter, r *http.Request) {
 
 	posts, err := h.queries.ListPublishedPostsByTag(r.Context(), tagSlug, int32(limit), int32(offset))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list posts")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to list posts")
 		return
 	}
 
-	total, _ := h.queries.CountPublishedPostsByTag(r.Context(), tagSlug)
+	total, err := h.queries.CountPublishedPostsByTag(r.Context(), tagSlug)
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to count posts by tag")
+		return
+	}
 
 	var items []postListItem
 	for _, p := range posts {
-		items = append(items, h.posts.toListItem(r.Context(), p))
+		item, err := h.posts.toListItem(r.Context(), p)
+		if err != nil {
+			handler.ServerError(w, "INTERNAL_ERROR", "Failed to retrieve post details")
+			return
+		}
+		items = append(items, item)
 	}
 	if items == nil {
 		items = []postListItem{}

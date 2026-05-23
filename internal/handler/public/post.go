@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/texef-tech/winzzon-blog/internal/cache"
 	"github.com/texef-tech/winzzon-blog/internal/db/sqlc"
 	"github.com/texef-tech/winzzon-blog/internal/handler"
@@ -65,7 +66,7 @@ type postListItem struct {
 	Tags        []briefItem `json:"tags"`
 }
 
-func (h *PostHandler) toListItem(ctx context.Context, p sqlc.Post) postListItem {
+func (h *PostHandler) toListItem(ctx context.Context, p sqlc.Post) (postListItem, error) {
 	item := postListItem{
 		ID:          p.ID.String(),
 		Title:       p.Title,
@@ -79,7 +80,10 @@ func (h *PostHandler) toListItem(ctx context.Context, p sqlc.Post) postListItem 
 		item.PublishedAt = p.PublishedAt.Time.Format(time.RFC3339)
 	}
 
-	cats, _ := h.queries.ListCategoriesForPost(ctx, p.ID)
+	cats, err := h.queries.ListCategoriesForPost(ctx, p.ID)
+	if err != nil {
+		return postListItem{}, err
+	}
 	for _, c := range cats {
 		item.Categories = append(item.Categories, briefItem{Name: c.Name, Slug: c.Slug})
 	}
@@ -87,7 +91,10 @@ func (h *PostHandler) toListItem(ctx context.Context, p sqlc.Post) postListItem 
 		item.Categories = []briefItem{}
 	}
 
-	tags, _ := h.queries.ListTagsForPost(ctx, p.ID)
+	tags, err := h.queries.ListTagsForPost(ctx, p.ID)
+	if err != nil {
+		return postListItem{}, err
+	}
 	for _, t := range tags {
 		item.Tags = append(item.Tags, briefItem{Name: t.Name, Slug: t.Slug})
 	}
@@ -95,7 +102,7 @@ func (h *PostHandler) toListItem(ctx context.Context, p sqlc.Post) postListItem 
 		item.Tags = []briefItem{}
 	}
 
-	return item
+	return item, nil
 }
 
 func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -119,15 +126,24 @@ func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	posts, err := h.queries.ListPublishedPosts(r.Context(), int32(limit), int32(offset))
 	if err != nil {
-		handler.ErrorJSON(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list posts")
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to list posts")
 		return
 	}
 
-	total, _ := h.queries.CountPublishedPosts(r.Context())
+	total, err := h.queries.CountPublishedPosts(r.Context())
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to count posts")
+		return
+	}
 
 	var items []postListItem
 	for _, p := range posts {
-		items = append(items, h.toListItem(r.Context(), p))
+		item, err := h.toListItem(r.Context(), p)
+		if err != nil {
+			handler.ServerError(w, "INTERNAL_ERROR", "Failed to retrieve post details")
+			return
+		}
+		items = append(items, item)
 	}
 	if items == nil {
 		items = []postListItem{}
@@ -177,13 +193,21 @@ func (h *PostHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 		resp.PublishedAt = post.PublishedAt.Time.Format(time.RFC3339)
 	}
 
-	cats, _ := h.queries.ListCategoriesForPost(r.Context(), post.ID)
+	cats, err := h.queries.ListCategoriesForPost(r.Context(), post.ID)
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to retrieve categories for post")
+		return
+	}
 	resp.Categories = []briefItem{}
 	for _, c := range cats {
 		resp.Categories = append(resp.Categories, briefItem{Name: c.Name, Slug: c.Slug})
 	}
 
-	tags, _ := h.queries.ListTagsForPost(r.Context(), post.ID)
+	tags, err := h.queries.ListTagsForPost(r.Context(), post.ID)
+	if err != nil {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to retrieve tags for post")
+		return
+	}
 	resp.Tags = []briefItem{}
 	for _, t := range tags {
 		resp.Tags = append(resp.Tags, briefItem{Name: t.Name, Slug: t.Slug})
@@ -210,8 +234,11 @@ func (h *PostHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 			resp.SEO.SchemaType = seo.SchemaType.String
 		}
 		resp.Schema = h.seoService.BuildArticleSchema(post, &seo)
-	} else {
+	} else if err == pgx.ErrNoRows {
 		resp.Schema = h.seoService.BuildArticleSchema(post, nil)
+	} else {
+		handler.ServerError(w, "INTERNAL_ERROR", "Failed to retrieve SEO meta")
+		return
 	}
 
 	if data, err := json.Marshal(resp); err == nil {

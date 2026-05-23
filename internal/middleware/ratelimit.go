@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/texef-tech/winzzon-blog/internal/handler"
 )
 
 type RateLimiter struct {
@@ -39,7 +40,7 @@ func (rl *RateLimiter) Limit(maxRequests int, window time.Duration) func(http.Ha
 			}
 
 			if count > int64(maxRequests) {
-				http.Error(w, `{"error":{"code":"RATE_LIMIT_EXCEEDED","message":"Too many requests"}}`, http.StatusTooManyRequests)
+				handler.ErrorJSON(w, http.StatusTooManyRequests, "RATE_LIMIT_EXCEEDED", "Too many requests")
 				return
 			}
 
