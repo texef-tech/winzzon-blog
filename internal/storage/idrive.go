@@ -54,3 +54,26 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 	})
 	return err
 }
+
+func (s *S3Storage) Get(ctx context.Context, key string) (io.ReadCloser, string, int64, error) {
+	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("failed to get object from S3: %w", err)
+	}
+
+	contentType := ""
+	if out.ContentType != nil {
+		contentType = *out.ContentType
+	}
+
+	contentLength := int64(0)
+	if out.ContentLength != nil {
+		contentLength = *out.ContentLength
+	}
+
+	return out.Body, contentType, contentLength, nil
+}
+
