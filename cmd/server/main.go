@@ -79,6 +79,7 @@ func main() {
 	pubCatH := publicHandler.NewCategoryHandler(queries, redisCache, pubPostH)
 	pubTagH := publicHandler.NewTagHandler(queries, redisCache, pubPostH)
 	pubSeoH := publicHandler.NewSEOHandler(seoSvc, redisCache)
+	pubMediaH := publicHandler.NewMediaHandler(s3Store)
 
 	r := chi.NewRouter()
 
@@ -95,6 +96,7 @@ func main() {
 	r.Get("/sitemap.xml", pubSeoH.Sitemap)
 	r.Get("/rss.xml", pubSeoH.RSS)
 	r.Get("/robots.txt", pubSeoH.RobotsTxt)
+	r.Get("/media/{filename}", pubMediaH.ServeMedia)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
